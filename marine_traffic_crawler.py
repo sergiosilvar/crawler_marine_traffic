@@ -6,13 +6,18 @@ import pandas as pd
 import logging
 from pathlib import Path
 import time
+from datetime import datetime
+
 
 
 logger = logging.getLogger(__name__)
+logging.basicConfig()
+logger.setLevel(logging.INFO)
+
 URL_BASE = 'http://www.marinetraffic.com'
 
 
-data_coleta = time.strftime("%d/%m/%y")
+
 
 def obtem_pagina(url):
     user_agent = {'User-agent': 'Mozilla/5.0'}
@@ -22,6 +27,15 @@ def cria_pasta(caminho_arquivo):
     pasta = caminho_arquivo.parent
     if not pasta.exists():
         pasta.mkdir(parents=True)
+
+def data_coleta():
+    return datetime.utcnow().strftime('%Y-%m-%d %H:%M')
+
+def converte_data(num):
+    return time.strftime('%Y-%m-%d %H:%M', time.gmtime(num))
+
+def salva_dataframe_csv(dataframe, caminho_arquivo):
+    dataframe.to_csv(caminho_arquivo, sep=';', index=False, mode='a')
 
 # # Navios de interesse
 
@@ -60,6 +74,7 @@ def crawl_navios_interesse(arquivo_csv='./output/navios_interesse.csv'):
     navios_erro = []
     for url in urls:
         try:
+            logger.info('Obtendo dados de navio em {}.'.format(url))
             r = obtem_pagina(url)
             soup = BeautifulSoup(r.text, 'lxml')
             detalhes = []
@@ -72,9 +87,10 @@ def crawl_navios_interesse(arquivo_csv='./output/navios_interesse.csv'):
             div_infos = div.find_all('div', class_='col-xs-6')
             for div in div_infos:
                 detalhes.extend([i.text for i in div.find_all('b')])
-            detalhes.append(data_coleta)
+            detalhes.append(data_coleta())
             navios.append(detalhes)
         except Exception as e:
+            logger.error('Erro ao obter dados do navio {}.'.format(url))
             navios_erro.append([str(e),url])
 
 
@@ -86,12 +102,12 @@ def crawl_navios_interesse(arquivo_csv='./output/navios_interesse.csv'):
     logger.info('Total de navios sem erro / com erros: {} / {}'.format(len(navios),len(navios_erro)))
 
     df = pd.DataFrame(navios, columns= ['Nome', 'IMO', 'MMSI', 'Indicativo', 'Bandeira',
-            'Tipo', 'Tonelagem', 'Porte', 'Comp_Larg', 'Ano', 'Estado', 'Data'])
+            'Tipo', 'Tonelagem', 'Porte', 'Comp_Larg', 'Ano', 'Estado', 'DataColeta'])
 
     # Salva arquivo no diretório indicado.
     caminho_arquivo = Path(arquivo_csv)
     cria_pasta(caminho_arquivo)
-    df.to_csv(caminho_arquivo.as_posix(), sep=';', index=False)
+    salva_dataframe_csv(df,caminho_arquivo.as_posix())
 
     logger.info('Arquivo {} criado.'.format(caminho_arquivo.as_posix()))
 
@@ -114,10 +130,14 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv'):
 
         # Percorrer todas as linhas da tabela.
         # A primeira linha é o cabeçalho, então iremos pulá-la.
-        for linha in table_portos.find_all('tr')[1:]:
+        linhas = table_portos.find_all('tr')
+        for linha in linhas[1:]:
 
             # Cada linha contém uma lista de células com os valores de interesse.
             celulas = linha.find_all('td')
+
+            # Pular propagada que contém apenas uma célula <td>.
+            if len(celulas) == 1: continue
 
             # Coluna da bandeira do país.
             col = celulas[0]
@@ -168,7 +188,7 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv'):
             # Armazena os dados de cada porto na tabela de portos.
             dados = [pais, nome_porto,codigo, tipo, cobertura_ais, link_bandeira_pais, link_navios_porto,
                      link_chegadas_esperadas, link_chegadas, link_porto, link_fotos,
-                     link_mapa_porto,]
+                     link_mapa_porto, data_coleta()]
             tabela_portos.append(dados)
 
         # Não há próxima página?
@@ -183,13 +203,13 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv'):
 
     cabecalho = ['Pais','Nome','Codigo','Tipo','CoberturaAIS','LinkBandeira','LinkNaviosPorto',
                  'LinkChegadasEsperadas','LinkChegadas','LinkPorto','LinkFotos',
-                'LinkMapaPorto']
+                'LinkMapaPorto', 'DataColeta']
     df = pd.DataFrame(tabela_portos, columns=cabecalho)
     caminho_arquivo = Path(arquivo_csv)
     cria_pasta(caminho_arquivo)
-    df.to_csv(caminho_arquivo.as_posix(), sep=';', index=False)
+    salva_dataframe_csv(df, caminho_arquivo.as_posix())
 
-def crawl_navios_porto(arquivo_csv='./output/navios_em_portos.csv'):
+def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv'):
     df_portos = pd.read_csv('./output/portos.csv', sep=';')
     tabela_navios_porto = []
 
@@ -206,10 +226,14 @@ def crawl_navios_porto(arquivo_csv='./output/navios_em_portos.csv'):
 
             # Percorrer todas as linhas da tabela.
             # A primeira linha é o cabeçalho, então iremos pulá-la.
-            for linha in table.find_all('tr')[1:]:
+            linhas = table.find_all('tr')
+            for linha in linhas[1:]:
 
                 # Cada linha contém uma lista de células com os valores de interesse.
                 celulas = linha.find_all('td')
+
+                # Pular propagada que contém apenas uma célula <td>.
+                if len(celulas) == 1: continue
 
                 # Coluna Tipo.
                 col = celulas[4]
@@ -245,23 +269,22 @@ def crawl_navios_porto(arquivo_csv='./output/navios_em_portos.csv'):
 
                 # Coluna Data Ultimo Sinal.
                 col = celulas[8]
-                data_ultimo_sinal = time.strftime('%Y-%m-%d %H:%M', time.gmtime(int(col.time.text.strip())))
+                data_ultimo_sinal = converte_data(int(col.time.text.strip()))
 
                 # Coluna Data Chegada.
                 col = celulas[9]
-                #data_chegada = time.strftime('%Y-%m-%d %H:%M', time.gmtime(int(col.a.time.text.strip())))
                 data_chegada = None
                 if col.time:
-                    data_chegada = time.strftime('%Y-%m-%d %H:%M', time.gmtime(int(col.time.text.strip())))
+                    data_chegada = converte_data(int(col.time.text.strip()))
 
                 # Armazena os dados de cada navio na tabela de navios.
-                dados = [porto, nome_navio, tipo, pais, dimensoes, porte, data_ultimo_sinal, data_chegada, link_bandeira_pais, link_fotos,data_coleta]
+                dados = [porto, nome_navio, tipo, pais, dimensoes, porte, data_ultimo_sinal, data_chegada, link_bandeira_pais, link_fotos,data_coleta()]
                 tabela_navios_porto.append(dados)
 
             # Não há próxima página?
             next_disabled = soup.find('span', class_='next disabled')
             if next_disabled:
-                logger.info('Fim da captura de navios.')
+                logger.info('Fim da captura de navios em portos.')
                 break
             else:
                 next_page = soup.find('span', class_='next')
@@ -271,12 +294,99 @@ def crawl_navios_porto(arquivo_csv='./output/navios_em_portos.csv'):
     df = pd.DataFrame(tabela_navios_porto, columns=cabecalho)
     caminho_arquivo = Path(arquivo_csv)
     cria_pasta(caminho_arquivo)
-    df.to_csv(caminho_arquivo.as_posix(), sep=';', index=False)
+    salva_dataframe_csv(df, caminho_arquivo.as_posix())
 
-    return df
+def crawl_chegadas_previstas(arquivo_csv='./output/chegadas_previstas.csv'):
+    df_portos = pd.read_csv('./output/portos.csv', sep=';')
+    tabela_chegadas_previstas = []
+
+    for nome_porto in ['PARANAGUA', 'RIO DE JANEIRO']:
+        porto = df_portos[df_portos.Nome==nome_porto]
+        url_chegadas_esperadas = URL_BASE + porto.LinkChegadasEsperadas.values[0]
+
+        while True:
+            logger.info('Capturar chegadas esperadas no porto {}'.format(url_chegadas_esperadas))
+            html_navios_porto = obtem_pagina(url_chegadas_esperadas).text
+            soup = BeautifulSoup(html_navios_porto, 'lxml')
+            # Tag <table> dos navios.
+            table = soup.find('table', class_='table table-hover text-left')
+
+            # Percorrer todas as linhas da tabela.
+            # A primeira linha é o cabeçalho, então iremos pulá-la.
+            linhas = table.find_all('tr')
+            for linha in linhas[1:]:
+
+                # Cada linha contém uma lista de células com os valores de interesse.
+                celulas = linha.find_all('td')
+
+                # Pular linha de propagada que contém apenas uma célula <td>.
+                if len(celulas) == 1: continue
+
+                # A primeira linha de dados tem a segunda célula com rowspan.
+                # As demais linhas não tem essa célula, então os ínidices das células
+                # precisam ser ajustados.
+                col = celulas[1]
+                ajuste = -1
+                if col.has_attr('rowspan'): ajuste = 0
+
+                # Coluna nome do navio.
+                col = celulas[2+ajuste]
+                nome_navio = col.a.text.strip()
+                link_icone_tipo_navio = None
+                if col.img:
+                    link_icone_tipo_navio = col.img['src']
+
+                # Coluna ETA Esperado.
+                col = celulas[3+ajuste]
+                eta_esperado = None
+                valor_data = col.span['data-time']
+                if valor_data:
+                    eta_esperado = converte_data(int(valor_data))
+
+                # Coluna ETA Calculado.
+                col = celulas[4+ajuste]
+                eta_calculado = None
+                valor_data = col.span['data-time']
+                if valor_data:
+                    eta_calculado = converte_data(int(valor_data))
+
+                # Coluna Data Chegada.
+                col = celulas[5+ajuste]
+                data_chegada = None
+                valor_data = col.span['data-time']
+                if valor_data:
+                    data_chegada = converte_data(int(valor_data))
+
+                # Link posição do navio
+                col = celulas[6+ajuste]
+                link_posicao_navio = col.a['href']
+
+
+                # Armazena os dados de cada navio na tabela de navios.
+                dados = [nome_porto, nome_navio, eta_esperado, eta_calculado, data_chegada, link_icone_tipo_navio, link_posicao_navio, data_coleta()]
+                tabela_chegadas_previstas.append(dados)
+
+            # Não há próxima página?
+            next_disabled = soup.find('span', class_='next disabled')
+            if next_disabled:
+                logger.info('Fim da captura de chegadas previstas.')
+                break
+            else:
+                next_page = soup.find('span', class_='next')
+                url_chegadas_esperadas = URL_BASE + next_page.a['href']
+
+    cabecalho = ['Porto', 'Navio','ETAEsperado','ETACalculado', 'DataChegada', 'LinkIconeTipoNavio', 'LinkPosicaoNavio', 'DataColeta']
+    df = pd.DataFrame(tabela_chegadas_previstas, columns=cabecalho)
+    caminho_arquivo = Path(arquivo_csv)
+    cria_pasta(caminho_arquivo)
+    salva_dataframe_csv(df, caminho_arquivo.as_posix())
+
+
+
+
 
 if __name__ =='__main__':
     #logging.basicConfig(filename='marine_traffic.log', filemode='w')
     logging.basicConfig()
     logger.setLevel(logging.INFO)
-    crawl_navios_porto()
+#    crawl_chegadas_previstas()
