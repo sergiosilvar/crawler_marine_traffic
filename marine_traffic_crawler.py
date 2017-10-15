@@ -1,8 +1,4 @@
-
 # coding: utf-8
-
-# In[257]:
-
 
 import requests
 from bs4 import BeautifulSoup
@@ -16,7 +12,7 @@ logger = logging.getLogger(__name__)
 URL_BASE = 'http://www.marinetraffic.com'
 
 
-data_coleta = time.strftime("%x")
+data_coleta = time.strftime("%d/%m/%y")
 
 def obtem_pagina(url):
     user_agent = {'User-agent': 'Mozilla/5.0'}
@@ -193,8 +189,94 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv'):
     cria_pasta(caminho_arquivo)
     df.to_csv(caminho_arquivo.as_posix(), sep=';', index=False)
 
+def crawl_navios_porto(arquivo_csv='./output/navios_em_portos.csv'):
+    df_portos = pd.read_csv('./output/portos.csv', sep=';')
+    tabela_navios_porto = []
+
+    for nome_porto in ['PARANAGUA', 'RIO DE JANEIRO']:
+        porto = df_portos[df_portos.Nome==nome_porto]
+        url_navios_porto = URL_BASE + porto.LinkNaviosPorto.values[0]
+
+        while True:
+            logger.info('Capturar navios no porto {}'.format(url_navios_porto))
+            html_navios_porto = obtem_pagina(url_navios_porto).text
+            soup = BeautifulSoup(html_navios_porto, 'lxml')
+            # Tag <table> dos navios.
+            table = soup.find('table', class_='table table-hover text-left')
+
+            # Percorrer todas as linhas da tabela.
+            # A primeira linha é o cabeçalho, então iremos pulá-la.
+            for linha in table.find_all('tr')[1:]:
+
+                # Cada linha contém uma lista de células com os valores de interesse.
+                celulas = linha.find_all('td')
+
+                # Coluna Tipo.
+                col = celulas[4]
+                tipo = col.text.strip()
+
+                # Se não for do tipo "tanker", pula para próximo navio.
+                if tipo.lower().find('tanker') == -1: continue
+
+
+                # Coluna da bandeira do país.
+                col = celulas[0]
+                pais = col.img.attrs['title']
+                link_bandeira_pais = col.img['src']
+
+
+                # Coluna de link para o navio.
+                col = celulas[1]
+                link_navio = col.a['href']
+                nome_navio = col.text.strip()
+
+                # Coluna Foto.
+                col = celulas[2]
+                link_fotos = col.a['href']
+
+
+                # Coluna Dimensões.
+                col = celulas[5]
+                dimensoes = col.text.strip()
+
+                # Coluna Porte.
+                col = celulas[6]
+                porte = col.text.strip()
+
+                # Coluna Data Ultimo Sinal.
+                col = celulas[8]
+                data_ultimo_sinal = time.strftime('%Y-%m-%d %H:%M', time.gmtime(int(col.time.text.strip())))
+
+                # Coluna Data Chegada.
+                col = celulas[9]
+                #data_chegada = time.strftime('%Y-%m-%d %H:%M', time.gmtime(int(col.a.time.text.strip())))
+                data_chegada = None
+                if col.time:
+                    data_chegada = time.strftime('%Y-%m-%d %H:%M', time.gmtime(int(col.time.text.strip())))
+
+                # Armazena os dados de cada navio na tabela de navios.
+                dados = [porto, nome_navio, tipo, pais, dimensoes, porte, data_ultimo_sinal, data_chegada, link_bandeira_pais, link_fotos,data_coleta]
+                tabela_navios_porto.append(dados)
+
+            # Não há próxima página?
+            next_disabled = soup.find('span', class_='next disabled')
+            if next_disabled:
+                logger.info('Fim da captura de navios.')
+                break
+            else:
+                next_page = soup.find('span', class_='next')
+                url_navios_porto = URL_BASE + next_page.a['href']
+
+    cabecalho = ['Porto', 'Nome','Tipo','Pais', 'Dimensoes', 'Porte', 'DataUltimoSinal', 'DataChegada', 'LinkBandeira','LinkFotos','DataColeta']
+    df = pd.DataFrame(tabela_navios_porto, columns=cabecalho)
+    caminho_arquivo = Path(arquivo_csv)
+    cria_pasta(caminho_arquivo)
+    df.to_csv(caminho_arquivo.as_posix(), sep=';', index=False)
+
+    return df
+
 if __name__ =='__main__':
     #logging.basicConfig(filename='marine_traffic.log', filemode='w')
     logging.basicConfig()
     logger.setLevel(logging.INFO)
-    crawl_portos_brasil()
+    crawl_navios_porto()
