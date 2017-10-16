@@ -19,9 +19,9 @@ URL_BASE = 'http://www.marinetraffic.com'
 
 
 
-def obtem_pagina(url):
+def obtem_pagina(url, proxy = None):
     user_agent = {'User-agent': 'Mozilla/5.0'}
-    return requests.get(url, headers = user_agent,)
+    return requests.get(url, headers = user_agent, proxy = proxies)
 
 def cria_pasta(caminho_arquivo):
     pasta = caminho_arquivo.parent
@@ -39,8 +39,13 @@ def salva_dataframe_csv(dataframe, caminho_arquivo):
 
 # # Navios de interesse
 
-# In[80]:
-def crawl_navios_interesse(arquivo_csv='./output/navios_interesse.csv'):
+'''
+    Crawl dos navios de interesse.
+
+    arquivo_csv - arquivo de saída.
+    proxy - proxy se necessário.
+'''
+def crawl_navios_interesse(arquivo_csv='./output/navios_interesse.csv', proxy=None):
 
     urls = ['https://www.marinetraffic.com/en/ais/details/ships/shipid:211947/mmsi:240069000/vessel:ELKA%20ARISTOTLE',
     'https://www.marinetraffic.com/pt/ais/details/ships/shipid:375133/mmsi:311585000/vessel:NORDIC%20RIO',
@@ -75,7 +80,7 @@ def crawl_navios_interesse(arquivo_csv='./output/navios_interesse.csv'):
     for url in urls:
         try:
             logger.info('Obtendo dados de navio em {}.'.format(url))
-            r = obtem_pagina(url)
+            r = obtem_pagina(url, proxy)
             soup = BeautifulSoup(r.text, 'lxml')
             detalhes = []
 
@@ -213,7 +218,7 @@ def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv'):
     df_portos = pd.read_csv('./output/portos.csv', sep=';')
     tabela_navios_porto = []
 
-    for nome_porto in ['PARANAGUA', 'RIO DE JANEIRO']:
+    for nome_porto in ['PARANAGUA', 'RIO DE JANEIRO','ITAQUI']:
         porto = df_portos[df_portos.Nome==nome_porto]
         url_navios_porto = URL_BASE + porto.LinkNaviosPorto.values[0]
 
@@ -278,7 +283,7 @@ def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv'):
                     data_chegada = converte_data(int(col.time.text.strip()))
 
                 # Armazena os dados de cada navio na tabela de navios.
-                dados = [porto, nome_navio, tipo, pais, dimensoes, porte, data_ultimo_sinal, data_chegada, link_bandeira_pais, link_fotos,data_coleta()]
+                dados = [nome_porto, nome_navio, tipo, pais, dimensoes, porte, data_ultimo_sinal, data_chegada, link_bandeira_pais, link_fotos,data_coleta()]
                 tabela_navios_porto.append(dados)
 
             # Não há próxima página?
