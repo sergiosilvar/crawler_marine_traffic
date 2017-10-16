@@ -21,7 +21,7 @@ URL_BASE = 'http://www.marinetraffic.com'
 
 def obtem_pagina(url, proxy = None):
     user_agent = {'User-agent': 'Mozilla/5.0'}
-    return requests.get(url, headers = user_agent, proxy = proxies)
+    return requests.get(url, headers = user_agent, proxies = proxy)
 
 def cria_pasta(caminho_arquivo):
     pasta = caminho_arquivo.parent
@@ -120,14 +120,14 @@ def crawl_navios_interesse(arquivo_csv='./output/navios_interesse.csv', proxy=No
 
 # In[236]:
 
-def crawl_portos_brasil(arquivo_csv='./output/portos.csv'):
+def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None):
     url = 'https://www.marinetraffic.com/en/ais/index/ports/all/flag:BR/port_type:p'
 
     tabela_portos = []
 
     while True:
         logger.info('Capturar portos em: {}'.format(url))
-        html_portos = obtem_pagina(url).text
+        html_portos = obtem_pagina(url, proxy=proxy).text
         soup = BeautifulSoup(html_portos, 'lxml')
 
         # Tag <table> dos portos.
@@ -214,17 +214,21 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv'):
     cria_pasta(caminho_arquivo)
     salva_dataframe_csv(df, caminho_arquivo.as_posix())
 
-def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv'):
+def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv', proxy=None):
     df_portos = pd.read_csv('./output/portos.csv', sep=';')
     tabela_navios_porto = []
+    
+    portos = pd.read_csv('./input/portos_interesse.csv', sep=';', encoding='latin-1')
+    portos = portos.Nome
+    
 
-    for nome_porto in ['PARANAGUA', 'RIO DE JANEIRO','ITAQUI']:
+    for nome_porto in portos:
         porto = df_portos[df_portos.Nome==nome_porto]
         url_navios_porto = URL_BASE + porto.LinkNaviosPorto.values[0]
 
         while True:
             logger.info('Capturar navios no porto {}'.format(url_navios_porto))
-            html_navios_porto = obtem_pagina(url_navios_porto).text
+            html_navios_porto = obtem_pagina(url_navios_porto, proxy=proxy).text
             soup = BeautifulSoup(html_navios_porto, 'lxml')
             # Tag <table> dos navios.
             table = soup.find('table', class_='table table-hover text-left')
@@ -291,9 +295,13 @@ def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv'):
             if next_disabled:
                 logger.info('Fim da captura de navios em portos.')
                 break
-            else:
+            elif soup.find('span', class_='next'):
                 next_page = soup.find('span', class_='next')
                 url_navios_porto = URL_BASE + next_page.a['href']
+            else:
+                logger.info('Fim da captura de navios em portos.')
+                break
+            
 
     cabecalho = ['Porto', 'Nome','Tipo','Pais', 'Dimensoes', 'Porte', 'DataUltimoSinal', 'DataChegada', 'LinkBandeira','LinkFotos','DataColeta']
     df = pd.DataFrame(tabela_navios_porto, columns=cabecalho)
@@ -301,17 +309,20 @@ def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv'):
     cria_pasta(caminho_arquivo)
     salva_dataframe_csv(df, caminho_arquivo.as_posix())
 
-def crawl_chegadas_previstas(arquivo_csv='./output/chegadas_previstas.csv'):
+def crawl_chegadas_previstas(arquivo_csv='./output/chegadas_previstas.csv', proxy=None):
     df_portos = pd.read_csv('./output/portos.csv', sep=';')
     tabela_chegadas_previstas = []
 
-    for nome_porto in ['PARANAGUA', 'RIO DE JANEIRO']:
+    portos = pd.read_csv('./input/portos_interesse.csv', sep=';', encoding='latin-1')
+    portos = portos.Nome
+    
+    for nome_porto in portos:
         porto = df_portos[df_portos.Nome==nome_porto]
         url_chegadas_esperadas = URL_BASE + porto.LinkChegadasEsperadas.values[0]
-
+    
         while True:
             logger.info('Capturar chegadas esperadas no porto {}'.format(url_chegadas_esperadas))
-            html_navios_porto = obtem_pagina(url_chegadas_esperadas).text
+            html_navios_porto = obtem_pagina(url_chegadas_esperadas,proxy=proxy).text
             soup = BeautifulSoup(html_navios_porto, 'lxml')
             # Tag <table> dos navios.
             table = soup.find('table', class_='table table-hover text-left')
@@ -376,10 +387,13 @@ def crawl_chegadas_previstas(arquivo_csv='./output/chegadas_previstas.csv'):
             if next_disabled:
                 logger.info('Fim da captura de chegadas previstas.')
                 break
-            else:
+            elif soup.find('span', class_='next'):
                 next_page = soup.find('span', class_='next')
                 url_chegadas_esperadas = URL_BASE + next_page.a['href']
-
+            else:
+                logger.info('Fim da captura de navios em portos.')
+                break
+                
     cabecalho = ['Porto', 'Navio','ETAEsperado','ETACalculado', 'DataChegada', 'LinkIconeTipoNavio', 'LinkPosicaoNavio', 'DataColeta']
     df = pd.DataFrame(tabela_chegadas_previstas, columns=cabecalho)
     caminho_arquivo = Path(arquivo_csv)
@@ -394,4 +408,11 @@ if __name__ =='__main__':
     #logging.basicConfig(filename='marine_traffic.log', filemode='w')
     logging.basicConfig()
     logger.setLevel(logging.INFO)
-#    crawl_chegadas_previstas()
+    proxies = {
+            'http': 'http://127.0.0.1:53128',
+            'https': 'http://127.0.0.1:53128',
+        }
+    crawl_navios_interesse(proxy = proxies)
+    crawl_portos_brasil(proxy = proxies)
+    crawl_navios_em_portos(proxy = proxies)
+    crawl_chegadas_previstas(proxy = proxies)
