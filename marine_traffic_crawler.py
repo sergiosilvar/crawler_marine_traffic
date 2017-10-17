@@ -217,10 +217,10 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None):
 def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv', proxy=None):
     df_portos = pd.read_csv('./output/portos.csv', sep=';')
     tabela_navios_porto = []
-    
+
     portos = pd.read_csv('./input/portos_interesse.csv', sep=';', encoding='latin-1')
     portos = portos.Nome
-    
+
 
     for nome_porto in portos:
         porto = df_portos[df_portos.Nome==nome_porto]
@@ -301,7 +301,7 @@ def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv', proxy=No
             else:
                 logger.info('Fim da captura de navios em portos.')
                 break
-            
+
 
     cabecalho = ['Porto', 'Nome','Tipo','Pais', 'Dimensoes', 'Porte', 'DataUltimoSinal', 'DataChegada', 'LinkBandeira','LinkFotos','DataColeta']
     df = pd.DataFrame(tabela_navios_porto, columns=cabecalho)
@@ -315,11 +315,11 @@ def crawl_chegadas_previstas(arquivo_csv='./output/chegadas_previstas.csv', prox
 
     portos = pd.read_csv('./input/portos_interesse.csv', sep=';', encoding='latin-1')
     portos = portos.Nome
-    
+
     for nome_porto in portos:
         porto = df_portos[df_portos.Nome==nome_porto]
         url_chegadas_esperadas = URL_BASE + porto.LinkChegadasEsperadas.values[0]
-    
+
         while True:
             logger.info('Capturar chegadas esperadas no porto {}'.format(url_chegadas_esperadas))
             html_navios_porto = obtem_pagina(url_chegadas_esperadas,proxy=proxy).text
@@ -393,7 +393,7 @@ def crawl_chegadas_previstas(arquivo_csv='./output/chegadas_previstas.csv', prox
             else:
                 logger.info('Fim da captura de navios em portos.')
                 break
-                
+
     cabecalho = ['Porto', 'Navio','ETAEsperado','ETACalculado', 'DataChegada', 'LinkIconeTipoNavio', 'LinkPosicaoNavio', 'DataColeta']
     df = pd.DataFrame(tabela_chegadas_previstas, columns=cabecalho)
     caminho_arquivo = Path(arquivo_csv)
@@ -412,6 +412,7 @@ if __name__ =='__main__':
             'http': 'http://127.0.0.1:53128',
             'https': 'http://127.0.0.1:53128',
         }
+    proxies = None
     crawl_navios_interesse(proxy = proxies)
     crawl_portos_brasil(proxy = proxies)
     crawl_navios_em_portos(proxy = proxies)
