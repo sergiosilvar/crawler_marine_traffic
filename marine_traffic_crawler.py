@@ -417,7 +417,11 @@ def crawl_chegadas_esperadas(arquivo_csv='./output/chegadas_esperadas.csv', prox
     df = pd.DataFrame(tabela_chegadas_esperadas, columns=cabecalho)
 
     # Pegar latitude e longitude a partir do link da posição.
-    df_latlong = df.LinkPosicaoNavio.str.extract('centerx:(?P<longitude>-?\d{,3}\.?\d*)/centery:-?(?P<latitude>\d{,3}\.?\d*)', expand=True)
+    df_latlong = df.LinkPosicaoNavio.str.extract('centerx:(?P<Longitude>-?\d{,3}\.?\d*)/centery:-?(?P<Latitude>\d{,3}\.?\d*)', expand=True)
+
+    # Issue #5
+    df_latlong['Latitude'] = df_latlong.Latitude.str.replace('.', ',')
+    df_latlong['Longitude'] = df_latlong.Longitude.str.replace('.', ',')
     df = df.join(df_latlong)
 
     caminho_arquivo = Path(arquivo_csv)
