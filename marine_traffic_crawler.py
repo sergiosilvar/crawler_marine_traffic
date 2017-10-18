@@ -436,8 +436,8 @@ if __name__ =='__main__':
             'http': 'http://127.0.0.1:53128',
             'https': 'http://127.0.0.1:53128',
         }
-    proxies = None
-    #crawl_navios_interesse(proxy = proxies)
-    #crawl_portos_brasil(proxy = proxies)
-    #crawl_navios_em_portos(proxy = proxies)
+    #proxies = None
+    crawl_navios_interesse(proxy = proxies)
+    crawl_portos_brasil(proxy = proxies)
+    crawl_navios_em_portos(proxy = proxies)
     crawl_chegadas_esperadas(proxy = proxies)
