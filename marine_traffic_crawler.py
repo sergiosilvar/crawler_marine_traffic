@@ -38,10 +38,10 @@ def converte_data(num):
 def salva_dataframe_csv(dataframe, caminho_arquivo):
     caminho_arquivo_acum = caminho_arquivo.replace('.csv', '_acumulado.csv')
 
-    dataframe.to_csv(caminho_arquivo_acum, sep=';', index=False, mode='a')
+    dataframe.to_csv(caminho_arquivo_acum, sep=';', index=False, mode='a', decimal=',')
     logger.info('Arquivo {} criado.'.format(caminho_arquivo_acum))
 
-    dataframe.to_csv(caminho_arquivo, sep=';', index=False, mode='w')
+    dataframe.to_csv(caminho_arquivo, sep=';', index=False, mode='w', decimal=',')
     logger.info('Arquivo {} criado.'.format(caminho_arquivo))
 
 
@@ -436,7 +436,7 @@ if __name__ =='__main__':
             'http': 'http://127.0.0.1:53128',
             'https': 'http://127.0.0.1:53128',
         }
-    #proxies = None
+    proxies = None
     crawl_navios_interesse(proxy = proxies)
     crawl_portos_brasil(proxy = proxies)
     crawl_navios_em_portos(proxy = proxies)
