@@ -218,6 +218,10 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None):
                  'LinkChegadasEsperadas','LinkChegadas','LinkPorto','LinkFotos',
                 'LinkMapaPorto', 'DataColeta']
     df = pd.DataFrame(tabela_portos, columns=cabecalho)
+
+    # Issue #3
+    df['Id'] = df.LinkPorto.str.extract(r'ports/(\d+)/Brazil')
+
     caminho_arquivo = Path(arquivo_csv)
     cria_pasta(caminho_arquivo)
     salva_dataframe_csv(df, caminho_arquivo.as_posix())
