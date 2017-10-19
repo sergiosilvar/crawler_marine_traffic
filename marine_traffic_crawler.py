@@ -239,6 +239,10 @@ def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv', proxy=No
         porto = df_portos[df_portos.Nome==nome_porto]
         url_navios_porto = URL_BASE + porto.LinkNaviosPorto.values[0]
 
+        # Adiciona filtro para navios tanques.
+        url_navios_porto += '/ship_type:8'
+
+
         while True:
             logger.info('Capturar navios no porto {}'.format(url_navios_porto))
             html_navios_porto = obtem_pagina(url_navios_porto, proxy=proxy).text
@@ -509,7 +513,7 @@ if __name__ =='__main__':
                 'https': 'http://127.0.0.1:53128',
             }
 
-    crawl_navios_interesse(proxy = proxies)
-    crawl_portos_brasil(proxy = proxies)
+    #crawl_navios_interesse(proxy = proxies)
+    #crawl_portos_brasil(proxy = proxies)
     crawl_navios_em_portos(proxy = proxies)
-    crawl_chegadas_esperadas(proxy = proxies)
+    #crawl_chegadas_esperadas(proxy = proxies)
