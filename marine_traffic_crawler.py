@@ -367,6 +367,9 @@ def crawl_chegadas_esperadas(arquivo_csv='./output/chegadas_esperadas.csv', prox
                 if col.img:
                     link_icone_tipo_navio = col.img['src']
 
+                # Se não for do tipo tanker (vi8.png), pula para próximo navio.
+                if link_icone_tipo_navio.find('vessel_types/vi8.png') == -1: continue
+
                 # Coluna ETA Esperado.
                 col = celulas[3+ajuste]
                 eta_esperado = None
@@ -433,13 +436,23 @@ def crawl_chegadas_esperadas(arquivo_csv='./output/chegadas_esperadas.csv', prox
     salva_dataframe_csv(df, caminho_arquivo.as_posix())
 
 
+def __configurar_log():
+    logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
+    rootLogger = logging.getLogger()
 
+    fileHandler = logging.FileHandler("marinetraffic.log")
+    fileHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(fileHandler)
+
+    consoleHandler = logging.StreamHandler()
+    consoleHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(consoleHandler)
+    logger.setLevel(logging.INFO)
 
 
 if __name__ =='__main__':
-    #logging.basicConfig(filename='marine_traffic.log', filemode='w')
-    logging.basicConfig()
-    logger.setLevel(logging.INFO)
+    __configurar_log()
+
     proxies = {
             'http': 'http://127.0.0.1:53128',
             'https': 'http://127.0.0.1:53128',
