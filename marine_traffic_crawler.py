@@ -53,33 +53,15 @@ def salva_dataframe_csv(dataframe, caminho_arquivo):
     arquivo_csv - arquivo de saída.
     proxy - proxy se necessário.
 '''
-def crawl_navios_interesse(arquivo_csv='./output/navios_interesse.csv', proxy=None):
+def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
+    navios_em_portos_csv='./output/navios_em_portos.csv',
+    chegadas_esperadas_csv='./output/chegadas_esperadas.csv', proxy=None):
 
-    urls = ['https://www.marinetraffic.com/en/ais/details/ships/shipid:211947/mmsi:240069000/vessel:ELKA%20ARISTOTLE',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:375133/mmsi:311585000/vessel:NORDIC%20RIO',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:374016/mmsi:311067700/vessel:CARTOLA',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:374017/mmsi:311067800/vessel:ATAULFO%20ALVES',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:775266/imo:9453822/mmsi:710016250/vessel:DRAGAO%20DO%20MAR',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:774708/mmsi:710020930/vessel:HENRIQUE%20DIAS',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:3733074/mmsi:710025780/vessel:JOSE%20DO%20PATROCINIO',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:4237514/imo:9453872/mmsi:710028630/vessel:MACHADO%20DE%20ASSIS',
-    'https://www.marinetraffic.com/pt/ais/details/ships/9453315/vessel:JOAO_CANDIDO',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:3563187/imo:9453858/mmsi:710024830/vessel:MARCILIO%20DIAS',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:4796933/imo:9453884/mmsi:710030790/vessel:MILTON%20SANTOS',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:368678/mmsi:308293000/imo:9308077/vessel:NAVION_GOTHENBURG',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:375128/imo:9248435/mmsi:311582000/vessel:NAVION%20STAVANGER',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:375130/mmsi:311584000/vessel:NORDIC%20BRASILIA',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:374858/mmsi:311435000/imo:9208045/vessel:NORDIC_SPIRIT',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:374925/mmsi:311471000/vessel:STENA%20SPIRIT',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:373974/mmsi:311066100/imo:9308065/vessel:STORVIKEN',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:775508/mmsi:710239000/vessel:ZUMBI%20DOS%20PALMARES',
-    'https://www.marinetraffic.com/pt/ais/details/ships/shipid:2982008/mmsi:710023040/vessel:ANDRE%20REBOUCAS',
-    'https://www.marinetraffic.com/en/ais/details/ships/shipid:279579/mmsi:247241200/vessel:EXCALIBUR',
-    'https://www.marinetraffic.com/en/ais/details/ships/shipid:2060845/mmsi:311000285/vessel:ESSHU%20MARU',
-    'https://www.marinetraffic.com/en/ais/details/ships/shipid:114502/mmsi:205423000/vessel:EXCELSIOR',
-    'https://www.marinetraffic.com/en/ais/details/ships/shipid:3058/mmsi:229673000/vessel:COOL%20RUNNER',
-    'https://www.marinetraffic.com/en/ais/details/ships/shipid:713685/mmsi:538004501/vessel:EXPERIENCE',
-    'https://www.marinetraffic.com/en/ais/details/ships/shipid:29755/mmsi:7100079/vessel:PLATAFORMA%20MERLUZA']
+
+    df_navios_em_portos =   pd.read_csv('./output/navios_em_portos.csv', sep=';')
+    df_chegadas_esperadas = pd.read_csv('./output/chegadas_esperadas.csv', sep=';')
+
+    urls = df_navios_em_portos.LinkNavio.append(df_chegadas_esperadas.LinkNavio).values
 
 
     #urls = [i for i in urls if i.find('MILTON')>0]
@@ -87,6 +69,7 @@ def crawl_navios_interesse(arquivo_csv='./output/navios_interesse.csv', proxy=No
     navios_erro = []
     for url in urls:
         try:
+            url = URL_BASE + url
             logger.info('Obtendo dados de navio em {}.'.format(url))
             r = obtem_pagina(url, proxy)
             soup = BeautifulSoup(r.text, 'lxml')
@@ -117,10 +100,25 @@ def crawl_navios_interesse(arquivo_csv='./output/navios_interesse.csv', proxy=No
     df = pd.DataFrame(navios, columns= ['Nome', 'IMO', 'MMSI', 'Indicativo', 'Bandeira',
             'Tipo', 'Tonelagem', 'Porte', 'Comp_Larg', 'Ano', 'Estado', 'DataColeta'])
 
+
+    df.Porte = df.Porte.str.replace(' t','')
+    df.replace({'Porte':{'-':None}, 'Ano':{'-':None}, 'Tonelagem':{'-':None},
+        'IMO':{'-':None}, 'MMSI':{'-':None}, 'Indicativo':{'-':None}}, inplace=True)
+    df.Comp_Larg.str.extract(r'(?P<Comprimento>\d+\.?\d*) × (?P<Largura>\d+\.?\d*)', expand=True)
+    comp_larg = df.Comp_Larg.str.split(' × ')
+    df['Comprimento'] = [i[0].replace('m','').replace('.',',') for i in comp_larg]
+    df['Largura'] = [i[1].replace('m','').replace('.',',') for i in comp_larg]
+    del df['Comp_Larg']
+    df.Porte = df.Porte.str.replace(' t', '')
+
+
     # Salva arquivo no diretório indicado.
     caminho_arquivo = Path(arquivo_csv)
     cria_pasta(caminho_arquivo)
     salva_dataframe_csv(df,caminho_arquivo.as_posix())
+
+    df_erro = pd.DataFrame(navios_erro, columns=['Erro','URL'])
+    salva_dataframe_csv(df_erro, './navios_erro.csv')
 
 
 
@@ -304,7 +302,9 @@ def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv', proxy=No
                     data_chegada = converte_data(int(col.time.text.strip()))
 
                 # Armazena os dados de cada navio na tabela de navios.
-                dados = [nome_porto, nome_navio, tipo, pais, dimensoes, porte, data_ultimo_sinal, data_chegada, link_bandeira_pais, link_fotos,data_coleta()]
+                dados = [nome_porto, nome_navio, tipo, pais, dimensoes, porte,
+                    data_ultimo_sinal, data_chegada, link_navio,
+                    link_bandeira_pais, link_fotos,data_coleta()]
                 tabela_navios_porto.append(dados)
 
             # Não há próxima página?
@@ -320,7 +320,9 @@ def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv', proxy=No
                 break
 
 
-    cabecalho = ['Porto', 'Nome','Tipo','Pais', 'Dimensoes', 'Porte', 'DataUltimoSinal', 'DataChegada', 'LinkBandeira','LinkFotos','DataColeta']
+    cabecalho = ['Porto', 'Nome','Tipo','Pais', 'Dimensoes', 'Porte',
+        'DataUltimoSinal', 'DataChegada', 'LinkNavio', 'LinkBandeira',
+        'LinkFotos','DataColeta']
     df = pd.DataFrame(tabela_navios_porto, columns=cabecalho)
     caminho_arquivo = Path(arquivo_csv)
     cria_pasta(caminho_arquivo)
@@ -502,7 +504,6 @@ def __configurar_log():
 if __name__ =='__main__':
     __configurar_log()
 
-    print(sys.argv)
     proxies = None
 
     # Se não tiver qualquer argumento, usa o proxy ptbrs.
@@ -513,7 +514,7 @@ if __name__ =='__main__':
                 'https': 'http://127.0.0.1:53128',
             }
 
-    #crawl_navios_interesse(proxy = proxies)
-    #crawl_portos_brasil(proxy = proxies)
+    crawl_portos_brasil(proxy = proxies)
     crawl_navios_em_portos(proxy = proxies)
-    #crawl_chegadas_esperadas(proxy = proxies)
+    crawl_chegadas_esperadas(proxy = proxies)
+    crawl_navios_interesse(proxy = proxies)
