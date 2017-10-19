@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 import time
 from datetime import datetime
-
+import sys
 
 
 logger = logging.getLogger(__name__)
@@ -498,12 +498,18 @@ def __configurar_log():
 if __name__ =='__main__':
     __configurar_log()
 
-    proxies = {
-            'http': 'http://127.0.0.1:53128',
-            'https': 'http://127.0.0.1:53128',
-        }
+    print(sys.argv)
     proxies = None
-    #crawl_navios_interesse(proxy = proxies)
-    #crawl_portos_brasil(proxy = proxies)
-    #crawl_navios_em_portos(proxy = proxies)
+
+    # Se não tiver qualquer argumento, usa o proxy ptbrs.
+    if len(sys.argv) == 1:
+
+        proxies = {
+                'http': 'http://127.0.0.1:53128',
+                'https': 'http://127.0.0.1:53128',
+            }
+
+    crawl_navios_interesse(proxy = proxies)
+    crawl_portos_brasil(proxy = proxies)
+    crawl_navios_em_portos(proxy = proxies)
     crawl_chegadas_esperadas(proxy = proxies)
