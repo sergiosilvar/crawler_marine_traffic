@@ -345,6 +345,11 @@ def crawl_chegadas_esperadas(arquivo_csv='./output/chegadas_esperadas.csv', prox
             # Percorrer todas as linhas da tabela.
             # A primeira linha é o cabeçalho, então iremos pulá-la.
             linhas = table.find_all('tr')
+
+            primeira_linha_dados = True
+            rowspan_porto_origem = False
+            rowspan_eta_calculado = False
+
             for linha in linhas[1:]:
 
                 # Cada linha contém uma lista de células com os valores de interesse.
@@ -353,74 +358,114 @@ def crawl_chegadas_esperadas(arquivo_csv='./output/chegadas_esperadas.csv', prox
                 # Pular linha de propagada que contém apenas uma célula <td>.
                 if len(celulas) == 1: continue
 
+                # Issue #9.
                 # A primeira linha de dados tem a segunda célula com rowspan.
                 # As demais linhas não tem essa célula, então os ínidices das células
                 # precisam ser ajustados.
-                col = celulas[1]
-                ajuste = -1
-                if col.has_attr('rowspan'): ajuste = 0
+                idx_porto_origem = 1
+                idx_nome_navio = 2
+                idx_eta_informado = 3
+                idx_eta_calculado = 4
+                idx_chegada_atual = 5
+                idx_posicao_navio = 6
+                if primeira_linha_dados:
+                    col = celulas[idx_porto_origem]
+                    if col.has_attr('rowspan'):
+                        rowspan_porto_origem = True
+                    col = celulas[4]
+                    if col.has_attr('rowspan'):
+                        rowspan_eta_calculado = True
+                    primeira_linha_dados = False
+                else:
+                    if rowspan_porto_origem:
+                        idx_porto_origem = None
+                        idx_nome_navio -= 1
+                        idx_eta_informado -= 1
+                        idx_eta_calculado -= 1
+                        idx_chegada_atual -= 1
+                        idx_posicao_navio -= 1
+                    if rowspan_eta_calculado:
+                        idx_eta_calculado = None
+                        idx_chegada_atual -= 1
+                        idx_posicao_navio -= 1
 
-                # Coluna nome do navio.
-                col = celulas[2+ajuste]
+
+                # Coluna nome do porto de origem.
+                nome_porto_origem = None
+                if idx_porto_origem:
+                    col = celulas[idx_porto_origem]
+                    nome_porto_origem = col.text.strip()
+
+                # Coluna nome  do navio.
+                col = celulas[idx_nome_navio]
                 nome_navio = col.a.text.strip()
+                link_navio = col.a['href'].strip()
                 link_icone_tipo_navio = None
                 if col.img:
                     link_icone_tipo_navio = col.img['src']
 
-                # Se não for do tipo tanker (vi8.png), pula para próximo navio.
-                if link_icone_tipo_navio.find('vessel_types/vi8.png') == -1: continue
+                    # Se não for do tipo tanker (vi8.png), pula para próximo navio.
+                    if link_icone_tipo_navio.find('vessel_types/vi8.png') == -1:
+                        continue
+                # Se não contiver imagem do tipo, pula para próximo navio.
+                else:
+                    continue
 
-                # Coluna ETA Esperado.
-                col = celulas[3+ajuste]
-                eta_esperado = None
-                if col.has_attr('data-time'):
-                    valor_data = col.span['data-time']
-                    if valor_data:
-                        eta_esperado = converte_data(int(valor_data))
+                # Coluna ETA Informado.
+                eta_informado = None
+                col = celulas[idx_eta_informado]
+                if col.span:
+                    if col.span.has_attr('data-time'):
+                        valor_data = col.span['data-time']
+                        if valor_data:
+                            eta_informado = converte_data(int(valor_data))
 
                 # Coluna ETA Calculado.
-                col = celulas[4+ajuste]
                 eta_calculado = None
-                if col.has_attr('data-time'):
-                    valor_data = col.span['data-time']
-                    if valor_data:
-                        eta_calculado = converte_data(int(valor_data))
+                if idx_eta_calculado:
+                    col = celulas[idx_eta_calculado]
+                    if col.span:
+                        if col.span.has_attr('data-time'):
+                            valor_data = col.span['data-time']
+                            if valor_data:
+                                eta_calculado = converte_data(int(valor_data))
 
-                # Coluna Data Chegada.
-                col = celulas[5+ajuste]
+                # Coluna Chegada Atual.
                 data_chegada = None
-                if col.has_attr('data-time'):
-                    valor_data = col.span['data-time']
-                    if valor_data:
-                        data_chegada = converte_data(int(valor_data))
+                col = celulas[idx_chegada_atual]
+                if col.span:
+                    if col.span.has_attr('data-time'):
+                        valor_data = col.span['data-time']
+                        if valor_data:
+                            data_chegada = converte_data(int(valor_data))
 
                 # Link posição do navio
                 link_posicao_navio = None
-                try:
-                    col = celulas[6+ajuste]
+                col = celulas[idx_posicao_navio]
+                if col.a:
                     link_posicao_navio = col.a['href']
-                except IndexError as e:
-                    # A tabela tem um <colspan> anterior e e não possui a quantidade de colunas por linhas.
-                    pass
 
 
                 # Armazena os dados de cada navio na tabela de navios.
-                dados = [nome_porto, nome_navio, eta_esperado, eta_calculado, data_chegada, link_icone_tipo_navio, link_posicao_navio, data_coleta()]
+                dados = [nome_porto, nome_porto_origem,nome_navio, eta_informado, eta_calculado, data_chegada, link_navio, link_icone_tipo_navio, link_posicao_navio, data_coleta()]
                 tabela_chegadas_esperadas.append(dados)
 
             # Não há próxima página?
             next_disabled = soup.find('span', class_='next disabled')
             if next_disabled:
-                logger.info('Fim da captura de chegadas esperadas para o porto {}.'.format(nome_porto))
+                logger.info('Fim da captura de chegadas esperadas para o ' \
+                    'porto {}.'.format(nome_porto))
                 break
             elif soup.find('span', class_='next'):
                 next_page = soup.find('span', class_='next')
                 url_chegadas_esperadas = URL_BASE + next_page.a['href']
             else:
-                logger.info('Fim da captura de chegadas esperadas para o porto {}.'.format(nome_porto))
+                logger.info('Fim da captura de chegadas esperadas para o ' \
+                    'porto {}.'.format(nome_porto))
                 break
 
-    cabecalho = ['Porto', 'Navio','ETAEsperado','ETACalculado', 'DataChegada', 'LinkIconeTipoNavio', 'LinkPosicaoNavio', 'DataColeta']
+    cabecalho = ['Porto', 'PortoOrigem','Navio','ETAInformado','ETACalculado', 'DataChegada',
+        'LinkNavio','LinkIconeTipoNavio', 'LinkPosicaoNavio', 'DataColeta']
     df = pd.DataFrame(tabela_chegadas_esperadas, columns=cabecalho)
 
     # Pegar latitude e longitude a partir do link da posição.
@@ -458,7 +503,7 @@ if __name__ =='__main__':
             'https': 'http://127.0.0.1:53128',
         }
     proxies = None
-    crawl_navios_interesse(proxy = proxies)
-    crawl_portos_brasil(proxy = proxies)
-    crawl_navios_em_portos(proxy = proxies)
+    #crawl_navios_interesse(proxy = proxies)
+    #crawl_portos_brasil(proxy = proxies)
+    #crawl_navios_em_portos(proxy = proxies)
     crawl_chegadas_esperadas(proxy = proxies)
