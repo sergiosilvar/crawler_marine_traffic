@@ -57,12 +57,10 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
     navios_em_portos_csv='./output/navios_em_portos.csv',
     chegadas_esperadas_csv='./output/chegadas_esperadas.csv', proxy=None):
 
-
     df_navios_em_portos =   pd.read_csv('./output/navios_em_portos.csv', sep=';')
     df_chegadas_esperadas = pd.read_csv('./output/chegadas_esperadas.csv', sep=';')
 
     urls = df_navios_em_portos.LinkNavio.append(df_chegadas_esperadas.LinkNavio).values
-
 
     #urls = [i for i in urls if i.find('MILTON')>0]
     navios = []
@@ -79,37 +77,36 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
             nome = soup.find('h1', class_='font-200 no-margin').text
             detalhes.append(nome)
 
+            # Tipo. Informação logo abaixo do nome no site.
+            tipo = None
+            div = soup.find('div', class_='group-ib vertical-offset-10')
+            if div:
+                tipo = div.text.strip()
+
+            # Restante das informações.
             div = soup.find('div', class_='row equal-height')
             div_infos = div.find_all('div', class_='col-xs-6')
             for div in div_infos:
                 detalhes.extend([i.text for i in div.find_all('b')])
+            detalhes.append(tipo)
             detalhes.append(data_coleta())
             navios.append(detalhes)
         except Exception as e:
             logger.error('Erro ao obter dados do navio {}.'.format(url))
             navios_erro.append([str(e),url])
 
-
-
-
-    # In[85]:
-
-
     logger.info('Total de navios sem erro / com erros: {} / {}'.format(len(navios),len(navios_erro)))
 
-    df = pd.DataFrame(navios, columns= ['Nome', 'IMO', 'MMSI', 'Indicativo', 'Bandeira',
-            'Tipo', 'Tonelagem', 'Porte', 'Comp_Larg', 'Ano', 'Estado', 'DataColeta'])
+    df = pd.DataFrame(navios, columns= ['Nome', 'IMO', 'MMSI', 'Indicativo',
+        'Bandeira', 'TipoAIS', 'Tonelagem', 'Porte', 'Comp_Larg', 'Ano',
+        'Estado','Tipo', 'DataColeta'])
 
-
+    df = df.replace('-',pd.np.nan)
     df.Porte = df.Porte.str.replace(' t','')
-    df.replace({'Porte':{'-':None}, 'Ano':{'-':None}, 'Tonelagem':{'-':None},
-        'IMO':{'-':None}, 'MMSI':{'-':None}, 'Indicativo':{'-':None}}, inplace=True)
-    df.Comp_Larg.str.extract(r'(?P<Comprimento>\d+\.?\d*) × (?P<Largura>\d+\.?\d*)', expand=True)
-    comp_larg = df.Comp_Larg.str.split(' × ')
-    df['Comprimento'] = [i[0].replace('m','').replace('.',',') for i in comp_larg]
-    df['Largura'] = [i[1].replace('m','').replace('.',',') for i in comp_larg]
-    del df['Comp_Larg']
-    df.Porte = df.Porte.str.replace(' t', '')
+    df['Comprimento'] = df.Comp_Larg.str.extract(r'(\d{0,4}(?:[.,]\d{1,3})?)m', expand=False)
+    df['Comprimento'] = df['Comprimento'].str.replace('.',',')
+    df['Largura'] = df.Comp_Larg.str.extract(r'(\d{0,4}(?:[.,]\d{1,3})?)m$', expand=False)
+    df['Largura'] = df['Largura'].str.replace('.',',')
 
 
     # Salva arquivo no diretório indicado.
@@ -218,7 +215,7 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None):
     df = pd.DataFrame(tabela_portos, columns=cabecalho)
 
     # Issue #3
-    df['Id'] = df.LinkPorto.str.extract(r'ports/(\d+)/Brazil')
+    df['Id'] = df.LinkPorto.str.extract(r'ports/(\d+)/Brazil', expand=False)
 
     caminho_arquivo = Path(arquivo_csv)
     cria_pasta(caminho_arquivo)
@@ -514,7 +511,7 @@ if __name__ =='__main__':
                 'https': 'http://127.0.0.1:53128',
             }
 
-    crawl_portos_brasil(proxy = proxies)
-    crawl_navios_em_portos(proxy = proxies)
-    crawl_chegadas_esperadas(proxy = proxies)
+#    crawl_portos_brasil(proxy = proxies)
+#    crawl_navios_em_portos(proxy = proxies)
+#    crawl_chegadas_esperadas(proxy = proxies)
     crawl_navios_interesse(proxy = proxies)
