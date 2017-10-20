@@ -55,7 +55,8 @@ def salva_dataframe_csv(dataframe, caminho_arquivo):
 '''
 def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
     navios_em_portos_csv='./output/navios_em_portos.csv',
-    chegadas_esperadas_csv='./output/chegadas_esperadas.csv', proxy=None):
+    chegadas_esperadas_csv='./output/chegadas_esperadas.csv', proxy=None,
+    limite = None):
 
     df_navios_em_portos =   pd.read_csv('./output/navios_em_portos.csv', sep=';')
     df_chegadas_esperadas = pd.read_csv('./output/chegadas_esperadas.csv', sep=';')
@@ -65,12 +66,22 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
     #urls = [i for i in urls if i.find('MILTON')>0]
     navios = []
     navios_erro = []
+    i_limite = 1
     for url in urls:
-        try:
-            url = URL_BASE + url
-            logger.info('Obtendo dados de navio em {}.'.format(url))
-            r = obtem_pagina(url, proxy)
+        # Controle de limite de navios a buscar.
+        if limite and i_limite > limite:
+                break
+        i_limite += 1
+
+
+        url = URL_BASE + url
+        logger.info('Obtendo dados de navio em {}.'.format(url))
+
+        r = obtem_pagina(url, proxy)
+
+        if r.status_code == 200: # Código HTTP de OK.
             soup = BeautifulSoup(r.text, 'lxml')
+
             detalhes = []
 
             # Nome do navio
@@ -86,14 +97,15 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
             # Restante das informações.
             div = soup.find('div', class_='row equal-height')
             div_infos = div.find_all('div', class_='col-xs-6')
-            for div in div_infos:
-                detalhes.extend([i.text for i in div.find_all('b')])
+            for div_ in div_infos:
+                detalhes.extend([i.text for i in div_.find_all('b')])
             detalhes.append(tipo)
             detalhes.append(data_coleta())
             navios.append(detalhes)
-        except Exception as e:
-            logger.error('Erro ao obter dados do navio {}.'.format(url))
-            navios_erro.append([str(e),url])
+        else:
+            s = 'Erro código HTTP {} ao obter dados do navio {}.'.format(r.status_code, url)
+            logger.error(s)
+            navios_erro.append([s,url])
 
     logger.info('Total de navios sem erro / com erros: {} / {}'.format(len(navios),len(navios_erro)))
 
@@ -511,7 +523,7 @@ if __name__ =='__main__':
                 'https': 'http://127.0.0.1:53128',
             }
 
-#    crawl_portos_brasil(proxy = proxies)
-#    crawl_navios_em_portos(proxy = proxies)
-#    crawl_chegadas_esperadas(proxy = proxies)
+    crawl_portos_brasil(proxy = proxies)
+    crawl_navios_em_portos(proxy = proxies)
+    crawl_chegadas_esperadas(proxy = proxies)
     crawl_navios_interesse(proxy = proxies)
