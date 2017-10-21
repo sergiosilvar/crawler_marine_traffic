@@ -94,13 +94,46 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
             if div:
                 tipo = div.text.strip()
 
+            # Latitude e longitude.
+            a_posicao = soup.find('a', class_='details_data_link')
+            link_posicao =None
+            latitude = None
+            longitude = None
+            if a_posicao:
+                if a_posicao['href']:
+                    link_posicao = a_posicao['href']
+                if a_posicao.text:
+                    coord = a_posicao.text
+                    coord = [i.strip() for i in coord.split('/')]
+                    coord = [i.replace('°','').replace('.',',') for i in coord]
+                    latitude, longitude = coord
+
+            # Data (UTC) último sinal recebido.
+            span = soup.find('span', text=re.compile('Position Received'))
+            data_ultimo_sinal = None
+            if span and span.parent and span.parent.strong and span.parent.strong.text:
+                texto = span.parent.strong.text.strip()
+                match = re.search(r'(\d\d\d\d-\d\d-\d\d\s\d\d:\d\d)', texto)
+                if match:
+                    data_ultimo_sinal = match.groups()[0]
+
+            # Área geográfica.
+            span = soup.find('span', text=mtc.re.compile('Area:'))
+            area_geografica = None
+            if span and span.parent and span.parent.strong and span.parent.strong.text:
+                area_geografica = span.parent.strong.text.strip()
+
+
+
             # Restante das informações.
             div = soup.find('div', class_='row equal-height')
             div_infos = div.find_all('div', class_='col-xs-6')
             for div_ in div_infos:
                 detalhes.extend([i.text for i in div_.find_all('b')])
-            detalhes.append(tipo)
-            detalhes.append(data_coleta())
+
+            detalhes.extend([tipo, latitude, longitude,
+                data_ultimo_sinal, area_geografica, link_posicao, url, data_coleta()])
+
             navios.append(detalhes)
         else:
             s = 'Erro código HTTP {} ao obter dados do navio {}.'.format(r.status_code, url)
@@ -111,7 +144,8 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
 
     df = pd.DataFrame(navios, columns= ['Nome', 'IMO', 'MMSI', 'Indicativo',
         'Bandeira', 'TipoAIS', 'Tonelagem', 'Porte', 'Comp_Larg', 'Ano',
-        'Estado','Tipo', 'DataColeta'])
+        'Estado','Tipo', 'Latitude', 'Longitude', 'DataUltimoSinal', 
+        'AreaGeografica', 'LinkPosicaoNavio', 'LinkNavio','DataColeta'])
 
     df = df.replace('-',pd.np.nan)
     df.Porte = df.Porte.str.replace(' t','')
