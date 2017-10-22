@@ -118,7 +118,7 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
                     data_ultimo_sinal = match.groups()[0]
 
             # Área geográfica.
-            span = soup.find('span', text=mtc.re.compile('Area:'))
+            span = soup.find('span', text=re.compile('Area:'))
             area_geografica = None
             if span and span.parent and span.parent.strong and span.parent.strong.text:
                 area_geografica = span.parent.strong.text.strip()
@@ -144,7 +144,7 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
 
     df = pd.DataFrame(navios, columns= ['Nome', 'IMO', 'MMSI', 'Indicativo',
         'Bandeira', 'TipoAIS', 'Tonelagem', 'Porte', 'Comp_Larg', 'Ano',
-        'Estado','Tipo', 'Latitude', 'Longitude', 'DataUltimoSinal', 
+        'Estado','Tipo', 'Latitude', 'Longitude', 'DataUltimoSinal',
         'AreaGeografica', 'LinkPosicaoNavio', 'LinkNavio','DataColeta'])
 
     df = df.replace('-',pd.np.nan)
@@ -169,12 +169,15 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
 
 # In[236]:
 
-def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None):
+def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None,
+    limite = None):
     url = 'https://www.marinetraffic.com/en/ais/index/ports/all/flag:BR/port_type:p'
 
     tabela_portos = []
 
+    i_limite = 1
     while True:
+
         logger.info('Capturar portos em: {}'.format(url))
         html_portos = obtem_pagina(url, proxy=proxy).text
         soup = BeautifulSoup(html_portos, 'lxml')
@@ -185,7 +188,12 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None):
         # Percorrer todas as linhas da tabela.
         # A primeira linha é o cabeçalho, então iremos pulá-la.
         linhas = table_portos.find_all('tr')
+
         for linha in linhas[1:]:
+            # Controle de limite de portos a buscar.
+            if limite and i_limite > limite:
+                    break
+            i_limite += 1
 
             # Cada linha contém uma lista de células com os valores de interesse.
             celulas = linha.find_all('td')
@@ -262,6 +270,16 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None):
 
     # Issue #3
     df['Id'] = df.LinkPorto.str.extract(r'ports/(\d+)/Brazil', expand=False)
+
+    # Issue #5
+    df_latlong = df.LinkMapaPorto.str.extract(
+        'centerx:(?P<Longitude>-?\d{,3}\.?\d*)/' +
+        'centery:(?P<Latitude>-?\d{,3}\.?\d*)',
+        expand=True)
+    df_latlong['Latitude'] = df_latlong.Latitude.str.replace('.', ',')
+    df_latlong['Longitude'] = df_latlong.Longitude.str.replace('.', ',')
+    df = df.join(df_latlong)
+
 
     caminho_arquivo = Path(arquivo_csv)
     cria_pasta(caminho_arquivo)
