@@ -16,8 +16,9 @@ logging.basicConfig()
 logger.setLevel(logging.INFO)
 
 URL_BASE = 'http://www.marinetraffic.com'
-
-
+ARQUIVO_PORTOS_BRASIL = './output/portos.csv'
+ARQUIVO_PORTOS_INTERESSE = './input/portos_interesse.csv'
+ARQUIVO_NAVIOS_EM_PORTOS = './output/navios_em_portos.csv'
 
 
 def obtem_pagina(url, proxy = None):
@@ -54,11 +55,11 @@ def salva_dataframe_csv(dataframe, caminho_arquivo):
     proxy - proxy se necessário.
 '''
 def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
-    navios_em_portos_csv='./output/navios_em_portos.csv',
+    navios_em_portos_csv=ARQUIVO_NAVIOS_EM_PORTOS,
     chegadas_esperadas_csv='./output/chegadas_esperadas.csv', proxy=None,
     limite = None):
 
-    df_navios_em_portos =   pd.read_csv('./output/navios_em_portos.csv', sep=';')
+    df_navios_em_portos =   pd.read_csv(ARQUIVO_NAVIOS_EM_PORTOS, sep=';')
     df_chegadas_esperadas = pd.read_csv('./output/chegadas_esperadas.csv', sep=';')
 
     urls = df_navios_em_portos.LinkNavio.append(df_chegadas_esperadas.LinkNavio).values
@@ -209,7 +210,7 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None,
             # Coluna de link para o porto.
             col = celulas[1]
             link_porto = URL_BASE+col.a['href']
-            nome_porto = col.text.strip()
+            nome_porto = col.text.strip().upper()
 
             # Coluna Codigo.
             col = celulas[2]
@@ -285,17 +286,43 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None,
     cria_pasta(caminho_arquivo)
     salva_dataframe_csv(df, caminho_arquivo.as_posix())
 
-def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv', proxy=None):
+def crawl_navios_em_portos(arquivo_csv=ARQUIVO_NAVIOS_EM_PORTOS,
+    arquivo_portos_interesse = ARQUIVO_PORTOS_INTERESSE,
+    arquivo_portos_brasil = ARQUIVO_PORTOS_BRASIL, proxy=None):
+
     tabela_navios_porto = []
 
+    path_arquivo_portos_interesse = Path(arquivo_portos_interesse)
+    if not path_arquivo_portos_interesse.exists():
+        logger.error('ARQUIVO DE PORTOS DE INTERESSE NÃO ENCONTRADO! ' \
+            'ESSE ARQUIVO É CRIADO PELO USUÁRIO E DEVE CONTER A COLUNA ' \
+            '"Nome": {}'.format(path_arquivo_portos_interesse.absolute().as_posix()))
+        return
+    path_arquivo_portos_brasil = Path(arquivo_portos_brasil)
+    if not path_arquivo_portos_brasil.exists():
+        logger.error('ARQUIVO DE PORTOS DO BRASIL NÃO ENCONTRADO. ' \
+            'ESSE ARQUIVO É GERADO PELO CRAWLER DE PORTOS: {}'. \
+            format(path_arquivo_portos_brasil.absolute().as_posix()))
+        return
 
-    df_portos_interesse = pd.read_csv('./input/portos_interesse.csv', sep=';', encoding='latin-1')
-    df_portos = pd.read_csv('./output/portos.csv', sep=';', encoding='latin-1')
+    df_portos_interesse = pd.read_csv(arquivo_portos_interesse, sep=';',
+        encoding='latin-1')
+    df_portos = pd.read_csv(arquivo_portos_brasil, sep=';', encoding='latin-1')
     nome_portos_interesse = df_portos_interesse.Nome.values
 
 
     for nome_porto in nome_portos_interesse:
-        porto = df_portos[df_portos.Nome==nome_porto]
+        porto = df_portos[df_portos.Nome==nome_porto.upper()]
+
+        # Verifica se os porto de interesse está no arquivo de portos.
+        # Caso não esteja, avisa o erro e pula para o próximo.
+        if len(porto) == 0:
+            logger.warn('PORTO DE INTERESSE "{}" CONFIGURADO NO ARQUVO "{}" '\
+            'NÃO CONSTA NO ARQUIVO "{}"!'.format(nome_porto,
+            path_arquivo_portos_interesse.absolute().as_posix(),
+            path_arquivo_portos_brasil.absolute().as_posix()))
+            continue
+
         url_navios_porto =  porto.LinkNaviosPorto.values[0]
 
         # Adiciona filtro para navios tanques.
@@ -391,17 +418,43 @@ def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv', proxy=No
     cria_pasta(caminho_arquivo)
     salva_dataframe_csv(df, caminho_arquivo.as_posix())
 
-def crawl_chegadas_esperadas(arquivo_csv='./output/chegadas_esperadas.csv', proxy=None):
+def crawl_chegadas_esperadas(arquivo_csv='./output/chegadas_esperadas.csv',
+    arquivo_portos_interesse = ARQUIVO_PORTOS_INTERESSE,
+    arquivo_portos_brasil = ARQUIVO_PORTOS_BRASIL, proxy=None):
     tabela_chegadas_esperadas = []
 
+    path_arquivo_portos_interesse = Path(arquivo_portos_interesse)
+    if not path_arquivo_portos_interesse.exists():
+        logger.error('ARQUIVO DE PORTOS DE INTERESSE NÃO ENCONTRADO! ' \
+            'ESSE ARQUIVO É CRIADO PELO USUÁRIO E DEVE CONTER A COLUNA ' \
+            '"Nome": {}'.format(path_arquivo_portos_interesse.absolute().as_posix()))
+        return
+    path_arquivo_portos_brasil = Path(arquivo_portos_brasil)
+    if not path_arquivo_portos_brasil.exists():
+        logger.error('ARQUIVO DE PORTOS DO BRASIL NÃO ENCONTRADO. ' \
+            'ESSE ARQUIVO É GERADO PELO CRAWLER DE PORTOS: {}'. \
+            format(path_arquivo_portos_brasil.absolute().as_posix()))
+        return
 
-    df_portos_interesse = pd.read_csv('./input/portos_interesse.csv', sep=';', encoding='latin-1')
-    df_portos = pd.read_csv('./output/portos.csv', sep=';', encoding='latin-1')
+
+    df_portos_interesse = pd.read_csv(arquivo_portos_interesse, sep=';', encoding='latin-1')
+    df_portos = pd.read_csv(arquivo_portos_brasil, sep=';', encoding='latin-1')
     nome_portos_interesse = df_portos_interesse.Nome.values
 
 
     for nome_porto in nome_portos_interesse:
-        porto = df_portos[df_portos.Nome==nome_porto]
+        porto = df_portos[df_portos.Nome==nome_porto.upper()]
+
+        # Verifica se os porto de interesse está no arquivo de portos.
+        # Caso não esteja, avisa o erro e pula para o próximo.
+        if len(porto) == 0:
+            logger.warn('PORTO DE INTERESSE "{}" CONFIGURADO NO ARQUVO "{}" '\
+            'NÃO CONSTA NO ARQUIVO "{}"!'.format(nome_porto,
+            path_arquivo_portos_interesse.absolute().as_posix(),
+            path_arquivo_portos_brasil.absolute().as_posix()))
+            continue
+
+
         url_chegadas_esperadas =   porto.LinkChegadasEsperadas.values[0]
 
         # Issue #20
