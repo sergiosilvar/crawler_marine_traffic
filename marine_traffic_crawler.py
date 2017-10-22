@@ -74,7 +74,7 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
         i_limite += 1
 
 
-        url = URL_BASE + url
+
         logger.info('Obtendo dados de navio em {}.'.format(url))
 
         r = obtem_pagina(url, proxy)
@@ -101,7 +101,7 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
             longitude = None
             if a_posicao:
                 if a_posicao['href']:
-                    link_posicao = a_posicao['href']
+                    link_posicao = URL_BASE+a_posicao['href']
                 if a_posicao.text:
                     coord = a_posicao.text
                     coord = [i.strip() for i in coord.split('/')]
@@ -171,7 +171,7 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
 
 def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None,
     limite = None):
-    url = 'https://www.marinetraffic.com/en/ais/index/ports/all/flag:BR/port_type:p'
+    url = 'https://www.marinetraffic.com/en/ais/index/ports/all/flag:BR/port_type:p/per_page:50'
 
     tabela_portos = []
 
@@ -204,11 +204,11 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None,
             # Coluna da bandeira do país.
             col = celulas[0]
             pais = col.img.attrs['title']
-            link_bandeira_pais = col.img['src']
+            link_bandeira_pais = URL_BASE+col.img['src']
 
             # Coluna de link para o porto.
             col = celulas[1]
-            link_porto = col.a['href']
+            link_porto = URL_BASE+col.a['href']
             nome_porto = col.text.strip()
 
             # Coluna Codigo.
@@ -217,7 +217,7 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None,
 
             # Coluna Foto.
             col = celulas[3]
-            link_fotos = col.a['href']
+            link_fotos = URL_BASE+col.a['href']
 
             # Coluna Tipo
             col = celulas[4]
@@ -225,23 +225,23 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None,
 
             # Coluna link para mapa do porto.
             col = celulas[5]
-            link_mapa_porto = col.a['href']
+            link_mapa_porto = URL_BASE+col.a['href']
 
             # Coluna Navios no porto.
             col = celulas[6]
-            link_navios_porto = col.a['href']
+            link_navios_porto = URL_BASE+col.a['href']
 
             # Coluna link partidas.
             col = celulas[7]
-            link_partidas = col.a['href']
+            link_partidas = URL_BASE+col.a['href']
 
             # Coluna link chegadas.
             col = celulas[8]
-            link_chegadas = col.a['href']
+            link_chegadas = URL_BASE+col.a['href']
 
             # Coluna link chegadas esperadas.
             col = celulas[9]
-            link_chegadas_esperadas = col.a['href']
+            link_chegadas_esperadas = URL_BASE+col.a['href']
 
             # Coluna status da cobertura AIS.
             col = celulas[10]
@@ -296,11 +296,13 @@ def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv', proxy=No
 
     for nome_porto in nome_portos_interesse:
         porto = df_portos[df_portos.Nome==nome_porto]
-        url_navios_porto = URL_BASE + porto.LinkNaviosPorto.values[0]
+        url_navios_porto =  porto.LinkNaviosPorto.values[0]
 
         # Adiciona filtro para navios tanques.
         url_navios_porto += '/ship_type:8'
 
+        # Issue #20
+        url_navios_porto += '/per_page:50'
 
         while True:
             logger.info('Capturar navios no porto {}'.format(url_navios_porto))
@@ -331,17 +333,17 @@ def crawl_navios_em_portos(arquivo_csv='./output/navios_em_portos.csv', proxy=No
                 # Coluna da bandeira do país.
                 col = celulas[0]
                 pais = col.img.attrs['title']
-                link_bandeira_pais = col.img['src']
+                link_bandeira_pais = URL_BASE+col.img['src']
 
 
                 # Coluna de link para o navio.
                 col = celulas[1]
-                link_navio = col.a['href']
+                link_navio = URL_BASE+col.a['href']
                 nome_navio = col.text.strip()
 
                 # Coluna Foto.
                 col = celulas[2]
-                link_fotos = col.a['href']
+                link_fotos = URL_BASE+col.a['href']
 
 
                 # Coluna Dimensões.
@@ -400,7 +402,10 @@ def crawl_chegadas_esperadas(arquivo_csv='./output/chegadas_esperadas.csv', prox
 
     for nome_porto in nome_portos_interesse:
         porto = df_portos[df_portos.Nome==nome_porto]
-        url_chegadas_esperadas = URL_BASE + porto.LinkChegadasEsperadas.values[0]
+        url_chegadas_esperadas =   porto.LinkChegadasEsperadas.values[0]
+
+        # Issue #20
+        url_chegadas_esperadas += '/per_page:50'
 
         while True:
             logger.info('Capturar chegadas esperadas no porto {}'.format(url_chegadas_esperadas))
@@ -466,10 +471,10 @@ def crawl_chegadas_esperadas(arquivo_csv='./output/chegadas_esperadas.csv', prox
                 # Coluna nome  do navio.
                 col = celulas[idx_nome_navio]
                 nome_navio = col.a.text.strip()
-                link_navio = col.a['href'].strip()
+                link_navio = URL_BASE+col.a['href'].strip()
                 link_icone_tipo_navio = None
                 if col.img:
-                    link_icone_tipo_navio = col.img['src']
+                    link_icone_tipo_navio = URL_BASE+col.img['src']
 
                     # Se não for do tipo tanker (vi8.png), pula para próximo navio.
                     if link_icone_tipo_navio.find('vessel_types/vi8.png') == -1:
@@ -510,11 +515,13 @@ def crawl_chegadas_esperadas(arquivo_csv='./output/chegadas_esperadas.csv', prox
                 link_posicao_navio = None
                 col = celulas[idx_posicao_navio]
                 if col.a:
-                    link_posicao_navio = col.a['href']
+                    link_posicao_navio = URL_BASE+col.a['href']
 
 
                 # Armazena os dados de cada navio na tabela de navios.
-                dados = [nome_porto, nome_porto_origem,nome_navio, eta_informado, eta_calculado, data_chegada, link_navio, link_icone_tipo_navio, link_posicao_navio, data_coleta()]
+                dados = [nome_porto, nome_porto_origem,nome_navio,
+                    eta_informado, eta_calculado, data_chegada, link_navio,
+                    link_icone_tipo_navio, link_posicao_navio, data_coleta()]
                 tabela_chegadas_esperadas.append(dados)
 
             # Não há próxima página?
