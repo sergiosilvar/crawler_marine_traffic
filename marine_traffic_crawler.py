@@ -64,7 +64,7 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
 
     urls = df_navios_em_portos.LinkNavio.append(df_chegadas_esperadas.LinkNavio).values
 
-    #urls = [i for i in urls if i.find('MILTON')>0]
+
     navios = []
     navios_erro = []
     i_limite = 1
@@ -172,7 +172,12 @@ def crawl_navios_interesse(arquivo_csv = './output/navios_interesse.csv',
 
 def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None,
     limite = None):
+
+    # Essa URL filtra os apenas os portos. Issue #22.
     url = 'https://www.marinetraffic.com/en/ais/index/ports/all/flag:BR/port_type:p/per_page:50'
+
+    # Essa URL pega todos os portos, incluindo ancoradouros, marinas, etc. Issue #22.
+    url = 'https://www.marinetraffic.com/en/ais/index/ports/all/flag:BR/per_page:50'
 
     tabela_portos = []
 
@@ -306,7 +311,7 @@ def crawl_navios_em_portos(arquivo_csv=ARQUIVO_NAVIOS_EM_PORTOS,
         return
 
     df_portos_interesse = pd.read_csv(arquivo_portos_interesse, sep=';',
-        encoding='latin-1')
+        encoding='latin-1', comment='#')
     df_portos = pd.read_csv(arquivo_portos_brasil, sep=';', encoding='latin-1')
     nome_portos_interesse = df_portos_interesse.Nome.values
 
@@ -437,7 +442,8 @@ def crawl_chegadas_esperadas(arquivo_csv='./output/chegadas_esperadas.csv',
         return
 
 
-    df_portos_interesse = pd.read_csv(arquivo_portos_interesse, sep=';', encoding='latin-1')
+    df_portos_interesse = pd.read_csv(arquivo_portos_interesse, sep=';',
+        encoding='latin-1', comment='#')
     df_portos = pd.read_csv(arquivo_portos_brasil, sep=';', encoding='latin-1')
     nome_portos_interesse = df_portos_interesse.Nome.values
 
