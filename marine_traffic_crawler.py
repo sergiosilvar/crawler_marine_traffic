@@ -287,6 +287,9 @@ def crawl_portos_brasil(arquivo_csv='./output/portos.csv', proxy=None,
     df = df.join(df_latlong)
 
 
+    # Issue #23.
+    df = df.drop_duplicates(['Nome','Codigo']).sort_values('Nome')
+
     caminho_arquivo = Path(arquivo_csv)
     cria_pasta(caminho_arquivo)
     salva_dataframe_csv(df, caminho_arquivo.as_posix())
