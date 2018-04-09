@@ -1,3 +1,10 @@
+
+# AVISO! WARNING!
+A estrutura HTML do site Marine Traffic mudou. Esse crawler está obsoleto.
+  
+The HTML structure from Marine Traffic site has changed. This code is deprecated.
+
+
 # crawler_marine_traffic
 Crawler para o site Marine Traffic, para fins eduacionais. Não use indiscriminadamente pois pode afetar o site. Contrate a API do Marine Traffic para suas necessidades de dados.
 
